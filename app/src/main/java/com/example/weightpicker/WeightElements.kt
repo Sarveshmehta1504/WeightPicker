@@ -2,6 +2,7 @@ package com.example.weightpicker
 
 import android.graphics.Color.WHITE
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,13 +16,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.withRotation
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.roundToInt
 import kotlin.math.sin
 
 @Composable
@@ -44,7 +49,40 @@ fun Scale(
     var angle by remember {
         mutableStateOf(0f)
     }
-    Canvas(modifier = modifier) {
+    var dragStartedAngle by remember {
+        mutableStateOf(0f)
+    }
+    var oldAngle by remember {
+        mutableStateOf(angle)
+    }
+    Canvas(
+        modifier = modifier
+            .pointerInput(true) {
+                detectDragGestures (
+                    onDragStart = {offset ->
+                        dragStartedAngle = -atan2(
+                            y = circleCenter.x - offset.x,
+                            x = circleCenter.y - offset.y
+                        ) * (180f/ PI.toFloat())
+                    },
+                    onDragEnd = {
+                        oldAngle = angle
+                    }
+                ){ change, _ ->
+                    val touchAngle = -atan2(
+                        circleCenter.x - change.position.x,
+                        circleCenter.y - change.position.y
+
+                    ) * (180f/ PI.toFloat())
+                    val newAngle = oldAngle + (touchAngle - dragStartedAngle)
+                    angle = newAngle.coerceIn(
+                        minimumValue = initialWeight - maxWeight.toFloat(),
+                        maximumValue = initialWeight - minWeight.toFloat()
+                    )
+                    onWeightChange((initialWeight- angle).roundToInt())
+                }
+            }
+    ) {
         center = this.center
         circleCenter = Offset(
             center.x,
@@ -131,6 +169,32 @@ fun Scale(
                     start = lineStart,
                     end = lineEnd,
                     strokeWidth = 1.dp.toPx()
+                )
+                val middleTop = Offset(
+                    x = circleCenter.x,
+                    y = circleCenter.y - innerRadius - style.scaleIndicatorLength.toPx(),
+                )
+
+                val bottomLeft = Offset(
+                    x = circleCenter.x - 4f,
+                    y = circleCenter.y - innerRadius
+                )
+
+                val bottomRight = Offset(
+                    x = circleCenter.x + 4f,
+                    y = circleCenter.y - innerRadius
+                )
+
+                val indicator = Path().apply {
+                    moveTo(middleTop.x, middleTop.y)
+                    lineTo(bottomLeft.x, bottomLeft.y)
+                    lineTo(bottomRight.x,bottomRight.y)
+                    lineTo(middleTop.x, middleTop.y)
+
+                }
+                drawPath(
+                    path = indicator,
+                    color = style.scaleIndicatorColor
                 )
             }
         }
